@@ -71,8 +71,12 @@ class EdgarRequestForm(forms.Form):
 
                 # strip everything after closing bracket
                 desc_list = cols[2].split()
-                item_no = desc_list[desc_list.index('Item') + 1]
-                item_no = item_no[:item_no.find(']')]
+                try:
+                    item_no = desc_list[desc_list.index('Item') + 1]
+                    item_no = item_no[:item_no.find(']')]
+                except ValueError:
+                    # 'Item' was not present in the description
+                    item_no = ''
 
                 output = {
                     'filing': cols[0].strip(),
