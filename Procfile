@@ -1,1 +1,1 @@
-web: python manage.py runserver
+web: gunicorn edgar_tool.wsgi --log-file -
