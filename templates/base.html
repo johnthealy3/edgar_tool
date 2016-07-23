@@ -21,6 +21,16 @@
 					<input type="submit" value="Search"></input>
 				</form>
 			</div>
+			<div class="col-md-4">
+				<h2>CIK Lookup</h2>
+				<form action="/search/company/" method="POST" class="ajax">
+					{% csrf_token %}
+					{{ company_search_form.as_p }}
+					<input type="submit" value="Search"></input>
+				</form>
+			</div>
+			<div class="col-md-4 cik-results">
+			</div>
 		</div>
 	</section>
 	{% if resp %}
@@ -46,6 +56,7 @@
 					<td>{{ i.item_no }}</td>
 					<td>{{ i.item_desc }}</td>
 					<td>
+						<!-- <a href="#" data-link="{{ i.content }}" class="content-display">Show</a> -->
 						<a href="#" class="content-display">Show</a>
 						<div style="display: none;" class="content-item">
 							{{ i.content }}
@@ -65,11 +76,40 @@
 <script type="text/javascript">
 $('a.content-display').click( function (e) {
 	e.preventDefault();
-	var content = $(this).parents('td').find('.content-item').html();
+	var link = $(this).data("link");
+	if (link) {
+		$.get( link, function( resp ) {
+		  	var content = resp;
+		});
+	} else {
+		var content = $(this).parents('td').find('.content-item').html();
+	}
 	var $rightCol = $('.right-col');
-	console.log(content);
 	$rightCol.html(content); 
-})
+});
+
+$(document).on('submit', 'form.ajax', function (e) {
+  var $form = $(this);
+
+  // refactor to support save and test email buttons
+  var button = $(this).find('input[type=submit]:focus');
+  var button_text = button.text();
+
+  $form.find('.messages').remove();
+  e.preventDefault();
+
+  $.ajax({
+    url: $form.attr('action'),
+    type: $form.attr('method'),
+    data: $form.serialize(),
+    success: function (response) {
+      $('.cik-results').html(response.html);
+    },
+    error: function (xhr, textStatus) {
+      $('.cik-results').html(xhr.responseText);
+    }
+  });
+});
 </script>
 
 </body>

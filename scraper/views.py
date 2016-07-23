@@ -1,12 +1,14 @@
 from django.shortcuts import render
+from django.template.loader import render_to_string
+from django.views.decorators.http import require_http_methods
+from django.http import HttpResponse
 from django import forms
 import requests
-# import json
+import json
 import dateutil.parser as du
 # import dateutil.parser as du
 from BeautifulSoup import BeautifulSoup, SoupStrainer
 
-# Create your views here.
 '''
 Company Search
 https://www.sec.gov/cgi-bin/browse-edgar?company=[QUERY]&owner=exclude&action=getcompany
@@ -16,9 +18,40 @@ https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000819544&type=1
 '''
 
 
+class EdgarCompanySearchForm(forms.Form):
+    company = forms.CharField(max_length=255)
+
+    def save(self):
+
+        company_search_url = "https://www.sec.gov/cgi-bin/browse-edgar?" + \
+            "company=%s&owner=exclude&action=getcompany" % self.cleaned_data.get('company')
+
+        # It turns out this page uses very similar markup to the edgar request.
+        resp = requests.get(company_search_url)
+        soup = BeautifulSoup(
+            resp.content,
+            parseOnlyThese=SoupStrainer('table', {'class': 'tableFile2'}))
+
+        data = []
+        table = soup.find('table', attrs={'class': 'tableFile2'})
+        rows = table.findAll('tr')
+        for row in rows:
+            cols = row.findAll('td')
+            if cols:
+                cols = [ele.text for ele in cols]
+
+                output = {
+                    'cik': cols[0].strip(),
+                    'company_name': cols[1],
+                }
+                data.append(output)
+
+        return data
+
+
 class EdgarRequestForm(forms.Form):
     cik = forms.CharField(max_length=30)
-    filing = forms.CharField(max_length=30)
+    filing = forms.CharField(max_length=30, required=False)
     after_date = forms.DateField(required=False)
     before_date = forms.DateField(required=False)
 
@@ -83,7 +116,6 @@ class EdgarRequestForm(forms.Form):
                     'filing_date': filing_date,
                     'item_no': item_no,
                     'item_desc': 'FOO',
-                    # content will be the parse, not the url
                     'content': content,
                 }
                 data.append(output)
@@ -92,6 +124,7 @@ class EdgarRequestForm(forms.Form):
 
 
 def edgar(request):
+    company_search_form = EdgarCompanySearchForm()
     if request.method == 'POST':
         form = EdgarRequestForm(data=request.POST)
         if form.is_valid():
@@ -105,4 +138,25 @@ def edgar(request):
     return render(request, "base.html", {
         'form': form,
         'resp': resp,
+        'company_search_form': company_search_form,
     })
+
+
+@require_http_methods(["POST"])
+def ajax_company_search(request):
+    form = EdgarCompanySearchForm(request.POST)
+    if form.is_valid():
+        data = form.save()
+        message = "Success"
+    else:
+        data = None
+        message = "Error"
+
+    html = render_to_string('company_search.html', {
+        'data': data,
+    })
+
+    return HttpResponse(json.dumps({
+        'html': html,
+        'message': message,
+    }), content_type='application/json')

@@ -20,4 +20,6 @@ from scraper import views
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
     url(r'^$', views.edgar, name='edgar'),
+    url(r'^search/company', views.ajax_company_search, name='company_search'),
+
 ]

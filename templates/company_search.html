@@ -1,0 +1,27 @@
+<table>
+	<thead>
+		<tr>
+			<th>CIK</th>
+			<th>Company Name</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for i in data %}
+		<tr>
+			<td><a href="#" class="cik">{{ i.cik }}</a></td>
+			<td>
+				{{ i.company_name }}
+			</td>
+		</tr>
+		{% endfor %}
+	</tbody>
+</table>
+
+<script type="text/javascript">
+$('.cik').click( function (e) {
+	e.preventDefault();
+	var cik = $(this).html();
+	console.log(cik);
+	$('input#id_cik').val(cik);
+});
+</script>
