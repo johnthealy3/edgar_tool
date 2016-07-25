@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django import forms
 import requests
@@ -54,21 +55,42 @@ class EdgarRequestForm(forms.Form):
     filing = forms.CharField(max_length=30, required=False)
     after_date = forms.DateField(required=False)
     before_date = forms.DateField(required=False)
+    item_no = forms.CharField(max_length=30, required=False,
+                              label="Item Number")
+    # TODO: add item filter
 
-    def get_document_for_item(self, url):
+    def clean_filing(self):
+        data = self.cleaned_data['filing']
+        return data.upper()
+
+    def get_document_for_item(self, url, doc_type):
         documents_page = requests.get(url)
         content = "No content found."
         if documents_page:
-            links = BeautifulSoup(
+
+            table = BeautifulSoup(
                 documents_page.content,
                 parseOnlyThese=SoupStrainer('table', {'class': 'tableFile'})
-            ).findAll('a')
-            links = [l for l in links if '.txt' in l.text]
-            if links:
-                content_url = "https://www.sec.gov%s" % links[0].get('href')
-                print(content_url)
-                resp = requests.get(content_url)
-                content = resp.content if resp else "Connection error."
+            )
+            html_link = None
+            # If there is an HTML document where "type" matches
+            # the type from the query, that's the formatted version.
+            # We scrape this for the appropriate item number and save that
+            # to content.
+            rows = table.findAll('tr')
+            for row in rows:
+                cols = row.findAll('td')
+                if cols and cols[3].text == doc_type:
+                    html_link = cols[2].find('a').get('href')
+                    content = html_link
+
+            if not html_link:
+                # This is the fallback. If there is only a text link,
+                # return it's url.
+                text_links = [l for l in table.findAll('a') if '.txt' in l.text]
+                if text_links:
+                    content = text_links[0].get('href')
+
         return content
 
     def save(self):
@@ -93,11 +115,13 @@ class EdgarRequestForm(forms.Form):
                 doc_url = "https://www.sec.gov%s" % \
                     cols[1].find('a', attrs={'id': 'documentsbutton'})\
                     .get('href')
-                content = self.get_document_for_item(doc_url)
 
                 cols = [ele.text for ele in cols]
-
+                filing = cols[0].strip()
                 filing_date = du.parse(cols[3].strip()).date()
+
+                content = self.get_document_for_item(doc_url, filing)
+
                 if (self.cleaned_data.get('after_date') and
                         filing_date < self.cleaned_data.get('after_date')):
                     continue
@@ -112,7 +136,7 @@ class EdgarRequestForm(forms.Form):
                     item_no = ''
 
                 output = {
-                    'filing': cols[0].strip(),
+                    'filing': filing,
                     'filing_date': filing_date,
                     'item_no': item_no,
                     'item_desc': 'FOO',
@@ -155,6 +179,29 @@ def ajax_company_search(request):
     html = render_to_string('company_search.html', {
         'data': data,
     })
+
+    return HttpResponse(json.dumps({
+        'html': html,
+        'message': message,
+    }), content_type='application/json')
+
+
+@require_http_methods(["POST"])
+@csrf_exempt
+def ajax_sec_url(request):
+    url = request.GET.get('url')
+    if url:
+        resp = requests.get("https://www.sec.gov%s" % url)
+        if resp:
+            html = resp.content
+            # do the parsing logic here
+            message = "Success"
+        else:
+            html = None
+            message = "Error"
+    else:
+        html = None
+        message = "Needs a valid url."
 
     return HttpResponse(json.dumps({
         'html': html,

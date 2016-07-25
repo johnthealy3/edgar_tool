@@ -56,11 +56,11 @@
 					<td>{{ i.item_no }}</td>
 					<td>{{ i.item_desc }}</td>
 					<td>
-						<!-- <a href="#" data-link="{{ i.content }}" class="content-display">Show</a> -->
-						<a href="#" class="content-display">Show</a>
+						<a href="#" data-link="{{ i.content }}" class="content-display">Show</a>
+<!-- 						<a href="#" class="content-display">Show</a>
 						<div style="display: none;" class="content-item">
 							{{ i.content }}
-						</div>
+						</div> -->
 					</td>
 				</tr>
 				{% endfor %}
@@ -78,13 +78,22 @@ $('a.content-display').click( function (e) {
 	e.preventDefault();
 	var link = $(this).data("link");
 	if (link) {
-		$.get( link, function( resp ) {
-		  	var content = resp;
-		});
+	  $.ajax({
+	    url: '/sec?url=' + link,
+	    type: 'POST',
+	    success: function (response) {
+	      var content = response.html;
+	    },
+	    error: function (xhr, textStatus) {
+	      var content = xhr.responseText;
+	    }
+	  });
 	} else {
 		var content = $(this).parents('td').find('.content-item').html();
 	}
 	var $rightCol = $('.right-col');
+	console.log(content);
+	// got the html, just need to display it
 	$rightCol.html(content); 
 });
 
