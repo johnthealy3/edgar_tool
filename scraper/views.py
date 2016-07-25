@@ -124,21 +124,41 @@ class EdgarRequestForm(forms.Form):
                         filing_date < self.cleaned_data.get('after_date')):
                     continue
 
-                content = self.get_document_for_item(doc_url, filing)
-
-                # strip everything after closing bracket
-                desc_list = cols[2].split()
+                # parse out a list of item numbers from description
+                desc_list = [c.lower().replace(']', '').replace(
+                             'acc-no:', '').replace(',', '')
+                             for c in cols[2].split()]
+                item_no = []
                 try:
-                    item_no = desc_list[desc_list.index('Item') + 1]
-                    item_no = item_no[:item_no.find(']')]
+                    item_no.append(desc_list[desc_list.index('item') + 1])
                 except ValueError:
-                    # 'Item' was not present in the description
-                    item_no = ''
+                    try:
+                        # look for multiples. this should probably be a regex.
+                        idx = desc_list.index('items') + 1
+                        item_no.append(desc_list[idx])
+                        for item in desc_list[idx + 1:]:
+                            try:
+                                float(item)
+                                item_no.append(item)
+                            except ValueError:
+                                # item is not numeric
+                                if item.strip().lower() != 'and':
+                                    break
+
+                    except ValueError:
+                        # 'Item' was not present in the description
+                        pass
+
+                if (self.cleaned_data.get('item_no') and
+                        self.cleaned_data.get('item_no') not in item_no):
+                    continue
+
+                content = self.get_document_for_item(doc_url, filing)
 
                 output = {
                     'filing': filing,
                     'filing_date': filing_date,
-                    'item_no': item_no,
+                    'item_no': ', '.join([i for i in item_no]),
                     'item_desc': 'FOO',
                     'content': content,
                 }
@@ -190,11 +210,53 @@ def ajax_company_search(request):
 @csrf_exempt
 def ajax_sec_url(request):
     url = request.GET.get('url')
+    items = request.GET.get('items')
+    if items:
+        items = [i.replace('.', '') for i in items.split(',')]
+
     if url:
         resp = requests.get("https://www.sec.gov%s" % url)
         if resp:
-            html = resp.content
-            # do the parsing logic here
+            if items:
+                print(items)
+                '''
+                find "<b>Item %s.</b>" % item_no
+                contents of <b> within next <td> is description
+
+                all markup after this table and before the next <hr />
+                is what we want to grab
+
+                markup seems to be very inconsistent. might need to search for 
+                the actual text instead
+                '''
+                soup = BeautifulSoup(resp.content)
+                bolds = soup.findAll('b')
+                html = ''
+                for b in bolds:
+                    if 'Item&nbsp;' in b.text:
+                        item_no = b.text.replace('Item&nbsp;', '').replace('.', '')
+                        print(item_no)
+                        if item_no in items:
+                            # this is one of our items. the next <b> is description
+                            # going to not worry about this for now, as we should
+                            # just store the descriptions in a lookup table
+                            html += repr(b) + ': '
+                            html += repr(b.findNext('b'))
+
+                            table = b.findParents('table')
+                            if table:
+                                table = table[0]
+                            # all markup after this table and before the
+                            # next <hr /> is what we want to grab
+                            # this doesn't seem to work
+                            for h in table.findAllNext():
+                                if h.name == 'hr':
+                                    break
+                                if h.name in ('p', 'div'):
+                                    html += '<p>' + h.text + '</p>'
+
+            else:
+                html = resp.content
             message = "Success"
         else:
             html = None

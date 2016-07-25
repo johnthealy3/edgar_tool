@@ -38,13 +38,13 @@
 	<section class="results">
 		<div class="row">
 		<div class="col-md-6">
-			<table>
+			<table style="width: 100%;">
 			<thead>
 				<tr>
 					<th>Filing</th>
 					<th>Filing Date</th>
 					<th>Item #</th>
-					<th>Description</th>
+					<!-- <th>Description</th> -->
 					<th>Content</th>
 				</tr>
 			</thead>
@@ -54,9 +54,9 @@
 					<td>{{ i.filing }}</td>
 					<td>{{ i.filing_date }}</td>
 					<td>{{ i.item_no }}</td>
-					<td>{{ i.item_desc }}</td>
+					<!-- <td>{{ i.item_desc }}</td> -->
 					<td>
-						<a href="#" data-link="{{ i.content }}" class="content-display">Show</a>
+						<a href="#" data-link="{{ i.content }}" data-items="[{{ i.item_no }}]" class="content-display">Show</a>
 <!-- 						<a href="#" class="content-display">Show</a>
 						<div style="display: none;" class="content-item">
 							{{ i.content }}
@@ -78,10 +78,12 @@ $('a.content-display').click( function (e) {
 	e.preventDefault();
 	var $rightCol = $('.right-col');
 	var link = $(this).data("link");
+	var items = $(this).data("items");
+
 	if (link) {
 	  // This is the preferred way to do it.
 	  $.ajax({
-	    url: '/sec?url=' + link,
+	    url: '/sec?url=' + link + '&items=' + items,
 	    type: 'POST',
 	    success: function (response) {
 	      $rightCol.html(response.html);
