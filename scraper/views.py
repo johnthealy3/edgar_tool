@@ -6,6 +6,7 @@ from django.http import HttpResponse
 from django import forms
 import requests
 import json
+import re
 import dateutil.parser as du
 # import dateutil.parser as du
 from BeautifulSoup import BeautifulSoup, SoupStrainer
@@ -220,14 +221,16 @@ def ajax_sec_url(request):
             if items:
                 print(items)
                 '''
+                Going to attempt to do this as cases first rather than
+                by reading the text directly.
+
+                Case 1: Bold tags
+
                 find "<b>Item %s.</b>" % item_no
                 contents of <b> within next <td> is description
 
                 all markup after this table and before the next <hr />
                 is what we want to grab
-
-                markup seems to be very inconsistent. might need to search for 
-                the actual text instead
                 '''
                 soup = BeautifulSoup(resp.content)
                 bolds = soup.findAll('b')
@@ -235,7 +238,6 @@ def ajax_sec_url(request):
                 for b in bolds:
                     if 'Item&nbsp;' in b.text:
                         item_no = b.text.replace('Item&nbsp;', '').replace('.', '')
-                        print(item_no)
                         if item_no in items:
                             # this is one of our items. the next <b> is description
                             # going to not worry about this for now, as we should
@@ -254,6 +256,30 @@ def ajax_sec_url(request):
                                     break
                                 if h.name in ('p', 'div'):
                                     html += '<p>' + h.text + '</p>'
+                if not html:
+                    '''
+                    Case 2: all divs
+
+                    Get all the divs and the text inside. Add to the HTML output
+                    all text inside all divs UNTIL the following:
+                    - another item number
+                    - SIGNATURE
+                    '''
+                    divs = soup.findAll('div')
+                    for d in divs:
+                        if d.text.startswith('Item'):
+                            item_no = re.findall('\d+', d.text.replace('.', ''))[0]
+                            if item_no in items:
+                                html += '<b>' + d.text + '</b>'
+                                last_text = d.text.strip()
+                                for h in d.findAllNext():
+                                    if h.text.strip() == last_text:
+                                        continue
+                                    if (h.text.startswith('Item') or
+                                            h.text.startswith('SIGNATURE')):
+                                        break
+                                    html += '<p>' + h.text.strip() + '</p>'
+                                    last_text = h.text.strip()
 
             else:
                 html = resp.content
