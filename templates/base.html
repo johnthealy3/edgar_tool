@@ -76,25 +76,24 @@
 <script type="text/javascript">
 $('a.content-display').click( function (e) {
 	e.preventDefault();
+	var $rightCol = $('.right-col');
 	var link = $(this).data("link");
 	if (link) {
+	  // This is the preferred way to do it.
 	  $.ajax({
 	    url: '/sec?url=' + link,
 	    type: 'POST',
 	    success: function (response) {
-	      var content = response.html;
+	      $rightCol.html(response.html);
 	    },
 	    error: function (xhr, textStatus) {
-	      var content = xhr.responseText;
+	      $rightCol.html(xhr.responseText);
 	    }
 	  });
 	} else {
 		var content = $(this).parents('td').find('.content-item').html();
+		$rightCol.html(content); 
 	}
-	var $rightCol = $('.right-col');
-	console.log(content);
-	// got the html, just need to display it
-	$rightCol.html(content); 
 });
 
 $(document).on('submit', 'form.ajax', function (e) {

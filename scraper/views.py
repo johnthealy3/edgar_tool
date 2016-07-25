@@ -120,11 +120,11 @@ class EdgarRequestForm(forms.Form):
                 filing = cols[0].strip()
                 filing_date = du.parse(cols[3].strip()).date()
 
-                content = self.get_document_for_item(doc_url, filing)
-
                 if (self.cleaned_data.get('after_date') and
                         filing_date < self.cleaned_data.get('after_date')):
                     continue
+
+                content = self.get_document_for_item(doc_url, filing)
 
                 # strip everything after closing bracket
                 desc_list = cols[2].split()
